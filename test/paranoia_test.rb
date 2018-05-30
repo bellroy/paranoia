@@ -36,6 +36,8 @@ def setup!
     'employers' => 'name VARCHAR(32), deleted_at DATETIME',
     'employees' => 'deleted_at DATETIME',
     'jobs' => 'employer_id INTEGER NOT NULL, employee_id INTEGER NOT NULL, deleted_at DATETIME',
+    'purchases' => 'deleted_at DATETIME',
+    'purchase_orders' => 'employer_id INTEGER NOT NULL, purchase_id INTEGER NOT NULL',
     'custom_column_models' => 'destroyed_at DATETIME',
     'custom_sentinel_models' => 'deleted_at DATETIME NOT NULL',
     'non_paranoid_models' => 'parent_model_id INTEGER',
@@ -376,25 +378,33 @@ class ParanoiaTest < test_framework
     assert_equal 0, employee.employers.count
   end
 
-  def test_link_table_for_has_many_through_relationships_with_update_method_call
-    employer = Employer.create
-    employee_1 = Employee.create(id: 1)
-    employee_2 = Employee.create(id: 2)
-    employee_3 = Employee.create(id: 3)
-    employee_4 = Employee.create(id: 4)
-    employee_5 = Employee.create(id: 5)
-    job_1 = Job.create :employer => employer, :employee => employee_1
-    job_2 = Job.create :employer => employer, :employee => employee_2
-    job_3 = Job.create :employer => employer, :employee => employee_3
+  def test_link_table_retains_records_with_update_call
+    employer = employer_with_associations
+
     assert_equal 3, employer.jobs.count
     assert_equal 3, employer.employees.count
-    assert_equal 1, employee_1.jobs.count
-    assert_equal 1, employee_2.employers.count
+    assert_equal 1, employer.employees.first.jobs.count
+    assert_equal 1, employer.employees.second.jobs.count
 
-    employer.update(employee_ids: [3,4,5])
+    employer.update(employee_ids: [3,4,5], name: 'Google')
+
     assert_equal 5, Employee.count
     assert_equal [3,4,5], Job.all.map(&:employee_id)
     assert_equal [1,2], Job.deleted.map(&:employee_id)
+    assert_equal 'Google', employer.name
+  end
+
+  def test_link_table_does_not_retains_records_with_update_call_when_not_paranoid
+    employer = employer_with_associations
+
+    assert_equal 2, employer.purchases.count
+    assert_equal 2, employer.purchase_orders.count
+
+    employer.update(purchase_ids: [], name: 'Apple')
+
+    assert_equal 0, PurchaseOrder.unscoped.count
+    assert_equal [1,2], Purchase.all.map(&:id)
+    assert_equal 'Apple', employer.name
   end
 
   def test_delete_behavior_for_callbacks
@@ -1080,6 +1090,23 @@ class ParanoiaTest < test_framework
   def get_featureful_model
     FeaturefulModel.new(:name => "not empty")
   end
+
+  def employer_with_associations
+    employer = Employer.create(name: 'Bellroy')
+    employee_1 = Employee.create(id: 1)
+    employee_2 = Employee.create(id: 2)
+    employee_3 = Employee.create(id: 3)
+    employee_4 = Employee.create(id: 4)
+    employee_5 = Employee.create(id: 5)
+    job_1 = Job.create :employer => employer, :employee => employee_1
+    job_2 = Job.create :employer => employer, :employee => employee_2
+    job_3 = Job.create :employer => employer, :employee => employee_3
+    purchase_1 = Purchase.create(id: 1)
+    purchase_2 = Purchase.create(id: 2)
+    purchase_order_1 = PurchaseOrder.create :employer => employer, :purchase => purchase_1
+    purchase_order_2 = PurchaseOrder.create :employer => employer, :purchase => purchase_2
+    employer
+  end
 end
 
 # Helper classes
@@ -1181,6 +1208,8 @@ class Employer < ActiveRecord::Base
   validates_uniqueness_of :name
   has_many :jobs
   has_many :employees, :through => :jobs
+  has_many :purchase_orders
+  has_many :purchases, :through => :purchase_orders
 end
 
 class Employee < ActiveRecord::Base
@@ -1193,6 +1222,17 @@ class Job < ActiveRecord::Base
   acts_as_paranoid
   belongs_to :employer
   belongs_to :employee
+end
+
+class PurchaseOrder < ActiveRecord::Base
+  belongs_to :employer
+  belongs_to :purchase
+end
+
+class Purchase < ActiveRecord::Base
+  acts_as_paranoid
+  has_many :purchase_orders
+  has_many :employers, :through => :purchase_orders
 end
 
 class CustomColumnModel < ActiveRecord::Base
