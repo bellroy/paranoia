@@ -33,11 +33,15 @@ def setup!
     'fail_callback_models' => 'deleted_at DATETIME',
     'related_models' => 'parent_model_id INTEGER, parent_model_with_counter_cache_column_id INTEGER, deleted_at DATETIME',
     'asplode_models' => 'parent_model_id INTEGER, deleted_at DATETIME',
-    'employers' => 'name VARCHAR(32), deleted_at DATETIME',
+    'employers' => 'name VARCHAR(32), employee_count INTEGER, date_established DATETIME, number_of_offices INTEGER, deleted_at DATETIME',
     'employees' => 'deleted_at DATETIME',
     'jobs' => 'employer_id INTEGER NOT NULL, employee_id INTEGER NOT NULL, deleted_at DATETIME',
     'purchases' => 'deleted_at DATETIME',
-    'purchase_orders' => 'employer_id INTEGER NOT NULL, purchase_id INTEGER NOT NULL',
+    'purchase_orders' => 'employer_id INTEGER NOT NULL, purchase_id INTEGER NOT NULL, deleted_at DATETIME',
+    'suppliers' => 'deleted_at DATETIME',
+    'accounts' => 'employer_id INTEGER NOT NULL, supplier_id INTEGER NOT NULL, deleted_at DATETIME',
+    'candidates' => 'deleted_at DATETIME',
+    'interviews' => 'employer_id INTEGER NOT NULL, candidate_id INTEGER NOT NULL, deleted_at DATETIME',
     'custom_column_models' => 'destroyed_at DATETIME',
     'custom_sentinel_models' => 'deleted_at DATETIME NOT NULL',
     'non_paranoid_models' => 'parent_model_id INTEGER',
@@ -405,6 +409,64 @@ class ParanoiaTest < test_framework
     assert_equal 0, PurchaseOrder.unscoped.count
     assert_equal [1,2], Purchase.all.map(&:id)
     assert_equal 'Apple', employer.name
+  end
+
+  def test_update_on_associations_with_dependent_destroy_when_not_paranoid
+    employer = employer_with_associations
+
+    assert_equal 2, PurchaseOrder.count
+    assert_equal 2, Purchase.count
+
+    employer.update(purchase_ids: [])
+
+    assert_equal 0, PurchaseOrder.count
+    assert_equal 2, Purchase.count
+  end
+
+  def test_update_on_associations_with_dependent_destroy_when_paranoid
+    employer = employer_with_associations
+
+    assert_equal 1, Interview.count
+    assert_equal 1, Candidate.count
+
+    employer.update(candidate_ids: [])
+
+    assert_equal 1, Interview.unscoped.count
+    assert_equal 1, Candidate.count
+  end
+
+  def test_update_on_associations_without_dependent_destroy_when_paranoid
+    employer = employer_with_associations
+
+    assert_equal 3, Job.count
+    assert_equal 5, Employee.count
+
+    employer.update(employee_ids: [])
+
+    assert_equal 0, Job.count
+    assert_equal 5, Employee.count
+  end
+
+  def test_update_on_associations_without_dependent_destroy_when_not_paranoid
+    employer = employer_with_associations
+
+    assert_equal 1, Account.count
+    assert_equal 1, Supplier.count
+
+    employer.update(supplier_ids: [])
+
+    assert_equal 0, Account.unscoped.count
+    assert_equal 1, Supplier.count
+  end
+
+  def test_update_on_top_level_attributes
+    employer = employer_with_associations
+
+    employer.update(name: 'Apple', employee_count: 123, date_established: Date.yesterday)
+    assert_equal 'Apple', employer.name
+    assert_equal 123, employer.employee_count
+    assert_equal Date.yesterday, employer.date_established
+    assert_equal 6, employer.number_of_offices # remains unchanged
   end
 
   def test_delete_behavior_for_callbacks
@@ -1087,12 +1149,19 @@ class ParanoiaTest < test_framework
   end
 
   private
+
   def get_featureful_model
     FeaturefulModel.new(:name => "not empty")
   end
 
   def employer_with_associations
-    employer = Employer.create(name: 'Bellroy')
+    employer = Employer.create(
+      name: 'Bellroy',
+      employee_count: 100,
+      date_established: Date.today,
+      number_of_offices: 6
+    )
+
     employee_1 = Employee.create(id: 1)
     employee_2 = Employee.create(id: 2)
     employee_3 = Employee.create(id: 3)
@@ -1101,10 +1170,18 @@ class ParanoiaTest < test_framework
     job_1 = Job.create :employer => employer, :employee => employee_1
     job_2 = Job.create :employer => employer, :employee => employee_2
     job_3 = Job.create :employer => employer, :employee => employee_3
+
     purchase_1 = Purchase.create(id: 1)
     purchase_2 = Purchase.create(id: 2)
     purchase_order_1 = PurchaseOrder.create :employer => employer, :purchase => purchase_1
     purchase_order_2 = PurchaseOrder.create :employer => employer, :purchase => purchase_2
+
+    candidate = Candidate.create
+    inteview = Interview.create :employer => employer, :candidate => candidate
+
+    supplier = Supplier.create
+    account = Account.create :employer => employer, :supplier => supplier
+
     employer
   end
 end
@@ -1203,13 +1280,24 @@ class RelatedModel < ActiveRecord::Base
   end
 end
 
+# Classes                | Paranoid? | Dependant Destroy?
+#--------------------------------------------------------
+# Account/Supplier       |     X     |         X
+# Employee/Job           |     ✓     |         X
+# Purchase/PurchaseOrder |     X     |         ✓
+# Interview/Candidate    |     ✓     |         ✓
+
 class Employer < ActiveRecord::Base
   acts_as_paranoid
   validates_uniqueness_of :name
   has_many :jobs
   has_many :employees, :through => :jobs
-  has_many :purchase_orders
-  has_many :purchases, :through => :purchase_orders
+  has_many :purchase_orders, dependent: :destroy
+  has_many :purchases, dependent: :destroy, :through => :purchase_orders
+  has_many :interviews, dependent: :destroy
+  has_many :candidates, dependent: :destroy, :through => :interviews
+  has_many :accounts
+  has_many :suppliers, :through => :accounts
 end
 
 class Employee < ActiveRecord::Base
@@ -1230,9 +1318,30 @@ class PurchaseOrder < ActiveRecord::Base
 end
 
 class Purchase < ActiveRecord::Base
-  acts_as_paranoid
   has_many :purchase_orders
   has_many :employers, :through => :purchase_orders
+end
+
+class Interview < ActiveRecord::Base
+  acts_as_paranoid
+  belongs_to :employer
+  belongs_to :candidate
+end
+
+class Candidate < ActiveRecord::Base
+  acts_as_paranoid
+  has_many :interviews
+  has_many :employers, :through => :interviews
+end
+
+class Account < ActiveRecord::Base
+  belongs_to :employer
+  belongs_to :supplier
+end
+
+class Supplier < ActiveRecord::Base
+  has_many :accounts
+  has_many :employers, :through => :accounts
 end
 
 class CustomColumnModel < ActiveRecord::Base
