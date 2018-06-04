@@ -17,7 +17,7 @@ env:
   global:
     - RAILS_ENV=test
 script:
-  - bundle exec rspec spec
+  - ruby -I test test/**/*.rb
 addons:
   ssh_known_hosts: git.trikeapps.com
 after_failure:
