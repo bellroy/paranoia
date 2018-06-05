@@ -372,3 +372,4 @@ You can use these events just like regular Rails callbacks with before, after an
 ## License
 
 This gem is released under the MIT license.
+
