@@ -57,7 +57,7 @@ module Paranoia
   end
 
   def paranoia_update(attributes)
-    attributes = attributes.with_indifferent_access
+    attributes = attributes.stringify_keys
     object_class = self.class
 
     has_many_through_associations = object_class.reflect_on_all_associations.select do |association|
