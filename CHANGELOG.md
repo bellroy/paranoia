@@ -1,5 +1,9 @@
 # paranoia Changelog
 
+## 2.4.2
+
+* Fix deprecation message on Hash#with_indifferent_access
+
 ## 2.4.1
 
 * [#435](https://github.com/rubysherpas/paranoia/pull/435) Monkeypatch activerecord relations to work with rails 5.2.0
