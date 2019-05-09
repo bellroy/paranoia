@@ -4,6 +4,12 @@
 
 * Fix deprecation message on Hash#with_indifferent_access
 
+## 2.4.2
+
+* [#470](https://github.com/rubysherpas/paranoia/pull/470) Add support for ActiveRecord 6.0
+
+  [Anton Kolodii](https://github.com/iggant), [Jared Norman](https://github.com/jarednorman)
+
 ## 2.4.1
 
 * [#435](https://github.com/rubysherpas/paranoia/pull/435) Monkeypatch activerecord relations to work with rails 5.2.0
