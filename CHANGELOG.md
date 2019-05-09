@@ -1,5 +1,9 @@
 # paranoia Changelog
 
+## 2.4.3
+
+* Fix deprecation message on Hash#with_indifferent_access
+
 ## 2.4.2
 
 * [#470](https://github.com/rubysherpas/paranoia/pull/470) Add support for ActiveRecord 6.0
