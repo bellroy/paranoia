@@ -1,6 +1,6 @@
 # paranoia Changelog
 
-## 2.4.2
+## 2.4.3
 
 * Fix deprecation message on Hash#with_indifferent_access
 
