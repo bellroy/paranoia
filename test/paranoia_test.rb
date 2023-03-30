@@ -396,11 +396,11 @@ class ParanoiaTest < test_framework
     model = CustomSentinelModel.new
     assert_equal 0, model.class.count
     model.save!
-    assert_equal Time.new(0).to_date, model.deleted_at.to_date
+    assert_equal Time.new(0), model.deleted_at
     assert_equal 1, model.class.count
     model.destroy
 
-    assert Time.new(0).to_date != model.deleted_at.to_time.to_date
+    assert Time.new(0) != model.deleted_at.to_time
     assert model.paranoia_destroyed?
 
     assert_equal 0, model.class.count
@@ -409,7 +409,7 @@ class ParanoiaTest < test_framework
     assert_equal 1, model.class.deleted.count
 
     model.restore
-    assert_equal Time.new(0).to_date, model.deleted_at.to_date
+    assert_equal Time.new(0), model.deleted_at
     assert !model.destroyed?
 
     assert_equal 1, model.class.count
