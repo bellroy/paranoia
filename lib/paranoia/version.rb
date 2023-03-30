@@ -1,3 +1,3 @@
 module Paranoia
-  VERSION = '2.4.4'.freeze
+  VERSION = '2.6.1'.freeze
 end
